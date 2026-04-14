@@ -1,0 +1,49 @@
+# FranBro example configuration
+#
+# This file is loaded by the franbro_node at startup.
+# Adjust the entries to match the topics / services / actions that are
+# available on THIS robot, and add the IP addresses / hostnames of all
+# other robots running a franbro_node.
+
+franbro:
+
+  # TCP port the local FranBro server listens on.
+  # All peers in the network must be able to reach this port.
+  port: 7890
+
+  # ── Topics owned by THIS node ─────────────────────────────────────────────
+  # The node will subscribe to these topics locally and forward every
+  # received message to all connected peer nodes.
+  topics:
+    - name: /robot/cmd_vel
+      type: geometry_msgs/msg/Twist
+    - name: /robot/odom
+      type: nav_msgs/msg/Odometry
+    - name: /robot/scan
+      type: sensor_msgs/msg/LaserScan
+
+  # ── Services owned by THIS node ───────────────────────────────────────────
+  # Peer nodes will expose proxy service servers for these, forwarding
+  # every call back to this node.
+  services:
+    - name: /robot/set_bool
+      type: std_srvs/srv/SetBool
+    - name: /robot/trigger
+      type: std_srvs/srv/Trigger
+
+  # ── Actions owned by THIS node ────────────────────────────────────────────
+  # Peer nodes will expose proxy action servers for these, forwarding
+  # goals / cancels / results / feedback back to this node.
+  actions:
+    - name: /robot/navigate
+      type: nav2_msgs/action/NavigateToPose
+
+  # ── Remote FranBro peers ──────────────────────────────────────────────────
+  # For each entry, a persistent TCP connection is established.
+  # After the handshake the capabilities advertised by the peer are mirrored
+  # locally (as proxy publishers / service servers / action servers).
+  remotes:
+    - host: 192.168.1.10   # robot-arm
+      port: 7890
+    - host: robot-arm.local  # same host, mDNS name
+      port: 7890

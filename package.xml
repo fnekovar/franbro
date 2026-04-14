@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>franbro</name>
+  <version>0.1.0</version>
+  <description>
+    FranBro: a ROS 2 Jazzy node that bridges topics, services and actions
+    across a network using a persistent TCP transport.
+  </description>
+  <maintainer email="todo@example.com">FranBro Maintainer</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>rcl_interfaces</depend>
+
+  <!-- generic pub/sub/client require these -->
+  <depend>rosidl_typesupport_cpp</depend>
+  <depend>rosidl_typesupport_introspection_cpp</depend>
+  <depend>rosidl_runtime_cpp</depend>
+
+  <!-- serialisation helpers -->
+  <depend>rmw</depend>
+
+  <!-- YAML config parsing -->
+  <depend>yaml-cpp</depend>
+
+  <!-- Boost.Asio is the transport layer -->
+  <depend>libboost-system-dev</depend>
+
+  <!-- JSON for handshake payload -->
+  <depend>nlohmann-json-dev</depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
