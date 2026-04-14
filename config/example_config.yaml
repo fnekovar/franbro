@@ -42,8 +42,12 @@ franbro:
   # For each entry, a persistent TCP connection is established.
   # After the handshake the capabilities advertised by the peer are mirrored
   # locally (as proxy publishers / service servers / action servers).
+  #
+  # NOTE: The two entries below are deliberately different hosts included for
+  # illustration only.  In a real deployment each entry must point to a
+  # distinct robot / machine.
   remotes:
-    - host: 192.168.1.10   # robot-arm
+    - host: 192.168.1.10      # robot-arm (by IP)
       port: 7890
-    - host: robot-arm.local  # same host, mDNS name
+    - host: robot-base.local  # another robot on the same LAN (mDNS name)
       port: 7890

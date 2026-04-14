@@ -115,17 +115,12 @@ void FranBroNode::setup_clients()
       remote.host,
       remote.port,
       [this, host = remote.host, port = remote.port](Connection::Ptr conn) {
-        // The on_close callback logs and schedules reconnect via the client.
-        // The client will re-fire on_connected once it reconnects.
         on_new_connection(conn, [this, host, port]() {
           RCLCPP_WARN(get_logger(),
             "Disconnected from %s:%u – will reconnect", host.c_str(), port);
         });
       },
-      [this, host = remote.host, port = remote.port]() {
-        RCLCPP_WARN(get_logger(),
-          "Disconnected from %s:%u – will reconnect", host.c_str(), port);
-      }));
+      nullptr));
   }
 }
 
