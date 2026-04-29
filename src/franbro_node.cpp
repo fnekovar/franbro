@@ -7,6 +7,7 @@
 #include <nlohmann/json.hpp>
 
 #include "franbro/config_parser.hpp"
+#include "franbro/generated_config_helper.hpp"
 
 namespace franbro
 {
@@ -19,7 +20,6 @@ FranBroNode::FranBroNode(const rclcpp::NodeOptions & options)
 : rclcpp::Node("franbro", options)
 , work_guard_(boost::asio::make_work_guard(io_ctx_))
 {
-  this->declare_parameter<std::string>("config_file", "");
   init();
 }
 
@@ -46,15 +46,8 @@ FranBroNode::~FranBroNode()
 
 void FranBroNode::init()
 {
-  const std::string config_path =
-    this->get_parameter("config_file").as_string();
-
-  if (config_path.empty()) {
-    throw std::runtime_error(
-      "FranBroNode: 'config_file' parameter must be set to the path of the YAML config.");
-  }
-
-  config_ = parse_config(config_path);
+  // Load compile-time generated configuration
+  config_ = get_generated_config();
 
   RCLCPP_INFO(get_logger(),
     "FranBro starting on port %u with %zu topic(s), %zu service(s), %zu action(s), "

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <stdexcept>
 
+#include <rclcpp/create_generic_client.hpp>
 #include <rclcpp/serialized_message.hpp>
 
 namespace franbro
@@ -19,84 +20,77 @@ ServiceBridge::ServiceBridge(
   for (const auto & svc : remote_services) {
     service_types_[svc.name] = svc.type;
 
-    auto server = node_->create_generic_service(
+    // Create a generic client to communicate with the remote service
+    // This allows us to call the actual service on the remote host
+    auto client = rclcpp::create_generic_client(
+      node_,
       svc.name,
       svc.type,
-      [this, name = svc.name](
-        std::shared_ptr<rmw_request_id_t> /*req_id*/,
-        std::shared_ptr<rclcpp::SerializedMessage> request,
-        std::shared_ptr<rclcpp::SerializedMessage> response)
-      {
-        uint32_t call_id = next_call_id();
-
-        // Register pending call
-        auto pending = std::make_shared<PendingCall>();
-        {
-          std::lock_guard<std::mutex> lk(calls_mu_);
-          pending_calls_[call_id] = pending;
-        }
-
-        // Build SERVICE_REQUEST frame: [call_id(4)][name_len(4)][name][cdr_bytes]
-        Frame frame;
-        frame.type = FrameType::SERVICE_REQUEST;
-        encode_uint32(frame.payload, call_id);
-        encode_string(frame.payload, name);
-
-        const auto & rcl_req = request->get_rcl_serialized_message();
-        frame.payload.insert(
-          frame.payload.end(),
-          rcl_req.buffer,
-          rcl_req.buffer + rcl_req.buffer_length);
-
-        connection_->send(std::move(frame));
-
-        // Block until response arrives (with 30 s timeout)
-        {
-          std::unique_lock<std::mutex> lk(pending->mu);
-          pending->cv.wait_for(
-            lk,
-            std::chrono::seconds(30),
-            [&pending]{ return pending->ready; });
-        }
-
-        {
-          std::lock_guard<std::mutex> lk(calls_mu_);
-          pending_calls_.erase(call_id);
-        }
-
-        if (!pending->ready) {
-          // Timeout: return an empty response
-          return;
-        }
-
-        // Copy serialised response bytes into the response message
-        const auto & resp_bytes = pending->response_payload;
-        auto & rcl_resp = response->get_rcl_serialized_message();
-
-        // Resize buffer if needed (use rcutils allocator)
-        if (rcl_resp.buffer_capacity < resp_bytes.size()) {
-          uint8_t * new_buf = static_cast<uint8_t *>(
-            rcl_resp.allocator.reallocate(
-              rcl_resp.buffer, resp_bytes.size(), rcl_resp.allocator.state));
-          if (!new_buf) {
-            RCLCPP_ERROR(node_->get_logger(), "ServiceBridge: failed to allocate response buffer");
-            return;
-          }
-          rcl_resp.buffer = new_buf;
-          rcl_resp.buffer_capacity = resp_bytes.size();
-        }
-        std::memcpy(rcl_resp.buffer, resp_bytes.data(), resp_bytes.size());
-        rcl_resp.buffer_length = resp_bytes.size();
-      },
       rclcpp::ServicesQoS());
 
-    servers_.push_back(server);
+    clients_.push_back(client);
+
+    RCLCPP_DEBUG(node_->get_logger(),
+      "ServiceBridge: Created client for remote service '%s' (type: %s)",
+      svc.name.c_str(), svc.type.c_str());
   }
 }
 
 uint32_t ServiceBridge::next_call_id()
 {
   return call_id_counter_.fetch_add(1, std::memory_order_relaxed);
+}
+
+std::vector<uint8_t> ServiceBridge::call_service(
+  const std::string & service_name,
+  const std::vector<uint8_t> & request_payload,
+  std::chrono::milliseconds timeout)
+{
+  // Allocate pending call state
+  uint32_t call_id = next_call_id();
+  auto pending = std::make_shared<PendingCall>();
+
+  {
+    std::lock_guard<std::mutex> lk(calls_mu_);
+    pending_calls_[call_id] = pending;
+  }
+
+  // Build SERVICE_REQUEST frame: [call_id(4)][service_name_len(4)][service_name][request_cdr...]
+  Frame request_frame;
+  request_frame.type = FrameType::SERVICE_REQUEST;
+  encode_uint32(request_frame.payload, call_id);
+  encode_string(request_frame.payload, service_name);
+  request_frame.payload.insert(
+    request_frame.payload.end(),
+    request_payload.begin(),
+    request_payload.end());
+
+  // Send the request
+  connection_->send(std::move(request_frame));
+
+  // Wait for response with timeout
+  {
+    std::unique_lock<std::mutex> lk(pending->mu);
+    if (!pending->cv.wait_for(lk, timeout, [&pending]() { return pending->ready; })) {
+      // Timeout
+      RCLCPP_WARN(node_->get_logger(),
+        "Service call timeout for service=%s, call_id=%u",
+        service_name.c_str(), call_id);
+      std::lock_guard<std::mutex> calls_lk(calls_mu_);
+      pending_calls_.erase(call_id);
+      return {};
+    }
+  }
+
+  // Extract and return response
+  std::vector<uint8_t> response = pending->response_payload;
+
+  {
+    std::lock_guard<std::mutex> lk(calls_mu_);
+    pending_calls_.erase(call_id);
+  }
+
+  return response;
 }
 
 void ServiceBridge::on_service_response(const Frame & frame)

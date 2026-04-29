@@ -9,6 +9,9 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
+#include <rclcpp/generic_publisher.hpp>
+#include <rclcpp/generic_client.hpp>
+#include <rclcpp/serialized_message.hpp>
 
 #include "franbro/config.hpp"
 #include "franbro/transport/protocol.hpp"
@@ -50,7 +53,7 @@ private:
   struct GoalHandle
   {
     uint32_t                                     call_id;
-    rclcpp::GenericService::SharedPtr            result_service_proxy;
+    rclcpp::GenericClient::SharedPtr             result_service_proxy;
     rclcpp::GenericPublisher::SharedPtr          feedback_pub;
     std::vector<uint8_t>                         result_payload;
     bool                                         result_ready{false};
@@ -63,15 +66,15 @@ private:
   rclcpp::Node::SharedPtr node_;
   Connection::Ptr         connection_;
 
-  // Servers / publishers / services backing each proxied action
-  // (goal service, cancel service, result service, feedback publisher)
+  // Clients / publishers / services backing each proxied action
+  // (goal client, cancel client, result client, feedback publisher)
   struct ActionProxy
   {
     std::string                       action_name;
     std::string                       action_type;
-    rclcpp::GenericService::SharedPtr goal_service;
-    rclcpp::GenericService::SharedPtr cancel_service;
-    rclcpp::GenericService::SharedPtr result_service;
+    rclcpp::GenericClient::SharedPtr  goal_client;
+    rclcpp::GenericClient::SharedPtr  cancel_client;
+    rclcpp::GenericClient::SharedPtr  result_client;
     rclcpp::GenericPublisher::SharedPtr feedback_publisher;
   };
 

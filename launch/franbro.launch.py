@@ -9,7 +9,7 @@ def generate_launch_description():
     config_file_arg = DeclareLaunchArgument(
         "config_file",
         default_value=PathJoinSubstitution(
-            [FindPackageShare("franbro"), "config", "example_config.yaml"]
+            [FindPackageShare("franbro"), "config", "pc_config.yaml"]
         ),
         description="Absolute path to the FranBro YAML configuration file.",
     )

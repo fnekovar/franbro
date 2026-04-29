@@ -1,0 +1,47 @@
+# FranBro example configuration
+#
+# This YAML configuration file is processed at compile-time to generate C++ code.
+# Modify this file and rebuild the package to change the configuration.
+#
+# The configuration specifies:
+# - Topics: Messages that are bridged across connections
+# - Services: RPC calls that are bridged
+# - Actions: Long-running operations that are bridged
+# - Remotes: Other FranBro nodes to connect to
+#
+# For each topic/service/action, specify its ROS name and full message type.
+
+franbro:
+
+  # TCP port the local FranBro server listens on.
+  # All peers in the network must be able to reach this port.
+  port: 7890
+
+  # Topics to bridge
+  # Format: name (ROS topic name), type (full message type)
+  topics:
+    - name: /robot/cmd_vel
+      type: geometry_msgs/msg/Twist
+    - name: /robot/odom
+      type: nav_msgs/msg/Odometry
+
+  # Services to bridge
+  # Format: name (ROS service name), type (full service type)
+  services:
+    - name: /robot/set_bool
+      type: std_srvs/srv/SetBool
+    - name: /robot/get_param
+      type: rcl_interfaces/srv/GetParameters
+
+  # Actions to bridge
+  # Format: name (ROS action name), type (full action type)
+  actions:
+    - name: /robot/navigate
+      type: nav2_msgs/action/NavigateToPose
+
+  # Remote FranBro nodes to connect to
+  # Format: host (hostname or IP), port (optional, defaults to 7890)
+  remotes:
+    - host: 192.168.1.100
+      port: 7890
+    - host: robot2.local

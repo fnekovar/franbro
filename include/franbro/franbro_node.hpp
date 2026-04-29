@@ -8,6 +8,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include "franbro/config.hpp"
+#include "franbro/generated_config_helper.hpp"
 #include "franbro/transport/protocol.hpp"
 #include "franbro/transport/transport_server.hpp"
 #include "franbro/transport/transport_client.hpp"

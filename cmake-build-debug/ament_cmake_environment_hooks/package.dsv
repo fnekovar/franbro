@@ -1,0 +1,4 @@
+source;share/franbro/local_setup.bash
+source;share/franbro/local_setup.dsv
+source;share/franbro/local_setup.sh
+source;share/franbro/local_setup.zsh

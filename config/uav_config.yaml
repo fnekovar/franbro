@@ -1,0 +1,23 @@
+# FranBro example configuration
+#
+# This file is loaded by the franbro_node at startup.
+# Adjust the entries to match the topics / services / actions that are
+# available on THIS robot, and add the IP addresses / hostnames of all
+# other robots running a franbro_node.
+
+franbro:
+
+  # TCP port the local FranBro server listens on.
+  # All peers in the network must be able to reach this port.
+  port: 7890
+
+  # ── Topics owned by THIS node ─────────────────────────────────────────────
+  # The node will subscribe to these topics locally and forward every
+  # received message to all connected peer nodes.
+  topics:
+    - name: /uav5/uav_manager/diagnostics
+      type: mrs_msgs/msg/UavManagerDiagnostics
+
+  remotes:
+    - host: 192.168.69.86      # robot-arm (by IP)
+      port: 7890

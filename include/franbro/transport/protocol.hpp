@@ -110,7 +110,7 @@ private:
   std::array<uint8_t, 8>       header_buf_{};
 
   // Send queue – protected by strand so writes are serialised.
-  boost::asio::strand<boost::asio::io_context::executor_type> strand_;
+  boost::asio::strand<boost::asio::any_io_executor> strand_;
   std::vector<std::vector<uint8_t>> send_queue_;
   bool                              sending_{false};
 

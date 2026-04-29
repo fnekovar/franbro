@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstring>
 
+#include <rclcpp/create_generic_client.hpp>
 #include <rclcpp/serialized_message.hpp>
 
 namespace franbro
@@ -31,106 +32,42 @@ ActionBridge::ActionBridge(
     const std::string base   = action.name + "/_action";
     const std::string a_type = action.type;
 
-    // ── Goal service proxy ────────────────────────────────────────────────────
-    proxy.goal_service = node_->create_generic_service(
+    // ── Goal service client proxy ────────────────────────────────────────────────────
+    // This client forwards goal requests to the remote action server
+    proxy.goal_client = rclcpp::create_generic_client(
+      node_,
       base + "/send_goal",
       a_type + "_SendGoal",
-      [this, action_name = action.name](
-        std::shared_ptr<rmw_request_id_t> /*req_id*/,
-        std::shared_ptr<rclcpp::SerializedMessage> request,
-        std::shared_ptr<rclcpp::SerializedMessage> response)
-      {
-        uint32_t call_id = next_call_id();
-
-        auto handle = std::make_shared<GoalHandle>();
-        handle->call_id = call_id;
-        {
-          std::lock_guard<std::mutex> lk(goals_mu_);
-          active_goals_[call_id] = handle;
-        }
-
-        // Frame: [call_id(4)][action_name_len(4)][action_name][cdr_goal_bytes]
-        Frame frame;
-        frame.type = FrameType::ACTION_GOAL;
-        encode_uint32(frame.payload, call_id);
-        encode_string(frame.payload, action_name);
-
-        const auto & rcl = request->get_rcl_serialized_message();
-        frame.payload.insert(frame.payload.end(), rcl.buffer, rcl.buffer + rcl.buffer_length);
-        connection_->send(std::move(frame));
-
-        // Block until result arrives
-        {
-          std::unique_lock<std::mutex> lk(handle->mu);
-          handle->cv.wait_for(
-            lk, std::chrono::seconds(60),
-            [&handle] { return handle->result_ready; });
-        }
-
-        {
-          std::lock_guard<std::mutex> lk(goals_mu_);
-          active_goals_.erase(call_id);
-        }
-
-        if (!handle->result_ready) {
-          return;
-        }
-
-        const auto & rb = handle->result_payload;
-        auto & rcl_resp = response->get_rcl_serialized_message();
-        if (rcl_resp.buffer_capacity < rb.size()) {
-          uint8_t * new_buf = static_cast<uint8_t *>(
-            rcl_resp.allocator.reallocate(
-              rcl_resp.buffer, rb.size(), rcl_resp.allocator.state));
-          if (!new_buf) { return; }
-          rcl_resp.buffer = new_buf;
-          rcl_resp.buffer_capacity = rb.size();
-        }
-        std::memcpy(rcl_resp.buffer, rb.data(), rb.size());
-        rcl_resp.buffer_length = rb.size();
-      },
       rclcpp::ServicesQoS());
 
-    // ── Cancel service proxy ──────────────────────────────────────────────────
-    proxy.cancel_service = node_->create_generic_service(
+    // ── Cancel service client proxy ──────────────────────────────────────────────────
+    // This client handles cancellation requests
+    proxy.cancel_client = rclcpp::create_generic_client(
+      node_,
       base + "/cancel_goal",
       "action_msgs/srv/CancelGoal",
-      [this](
-        std::shared_ptr<rmw_request_id_t> /*req_id*/,
-        std::shared_ptr<rclcpp::SerializedMessage> request,
-        std::shared_ptr<rclcpp::SerializedMessage> /*response*/)
-      {
-        // Forward the cancel request as an ACTION_CANCEL frame.
-        // We use call_id=0 to indicate "cancel all" for simplicity;
-        // a more complete implementation would parse the goal-id from request.
-        Frame frame;
-        frame.type = FrameType::ACTION_CANCEL;
-        encode_uint32(frame.payload, 0u);
-        const auto & rcl = request->get_rcl_serialized_message();
-        frame.payload.insert(frame.payload.end(), rcl.buffer, rcl.buffer + rcl.buffer_length);
-        connection_->send(std::move(frame));
-      },
       rclcpp::ServicesQoS());
 
-    // ── Get-result service proxy ──────────────────────────────────────────────
-    // Results are delivered via the goal-service callback above.
-    // We still expose the service so the action client can find it.
-    proxy.result_service = node_->create_generic_service(
+    // ── Get-result service client proxy ──────────────────────────────────────────────
+    // This client retrieves the result of a completed action
+    proxy.result_client = rclcpp::create_generic_client(
+      node_,
       base + "/get_result",
       a_type + "_GetResult",
-      [](
-        std::shared_ptr<rmw_request_id_t>,
-        std::shared_ptr<rclcpp::SerializedMessage>,
-        std::shared_ptr<rclcpp::SerializedMessage>) {},
       rclcpp::ServicesQoS());
 
     // ── Feedback publisher ────────────────────────────────────────────────────
+    // This publisher forwards feedback from the remote action to local clients
     proxy.feedback_publisher = node_->create_generic_publisher(
       base + "/feedback",
       a_type + "_FeedbackMessage",
       rclcpp::QoS(10));
 
     proxies_.push_back(std::move(proxy));
+
+    RCLCPP_DEBUG(node_->get_logger(),
+      "ActionBridge: Created proxy for remote action '%s' (type: %s)",
+      action.name.c_str(), action.type.c_str());
   }
 }
 
